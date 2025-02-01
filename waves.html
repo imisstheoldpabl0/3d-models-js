@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Wave Colorful Sphere</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, points, pivot;
+
+        // Color palette
+        const colorPalette = [
+            "#A7325D", "#341521", "#EA582E", "#DB416C", "#421726"
+        ];
+
+        // Wave parameters
+        const waves = [
+            { // Wave 1
+                speed: 0.6,
+                frequency: 24,
+                amplitude: 0.1,
+                direction: new THREE.Vector3(1, 0.5, 0.2).normalize(),
+                phase: 0
+            },
+            { // Wave 2
+                speed: 0.8,
+                frequency: 12,
+                amplitude: 0.1,
+                direction: new THREE.Vector3(-0.3, 1, 0.7).normalize(),
+                phase: Math.PI/2
+            },
+            { // Wave 3
+                speed: 1.1,
+                frequency: 2,
+                amplitude: 0.1,
+                direction: new THREE.Vector3(0.4, -0.8, 0.5).normalize(),
+                phase: Math.PI
+            }
+        ];
+
+        init();
+        animate();
+
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Create pivot for rotation
+            pivot = new THREE.Group();
+            scene.add(pivot);
+
+            // Create star texture
+            const canvas = document.createElement('canvas');
+            const textureSize = 512;
+            canvas.width = textureSize;
+            canvas.height = textureSize;
+            const context = canvas.getContext('2d');
+            
+            const gradient = context.createRadialGradient(
+                textureSize/2, textureSize/2, 0,
+                textureSize/2, textureSize/2, textureSize/2
+            );
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.3, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.6, 'rgba(255,255,255,0.8)');
+            gradient.addColorStop(0.9, 'rgba(255,255,255,0.3)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            
+            context.fillStyle = gradient;
+            context.beginPath();
+            context.arc(textureSize/2, textureSize/2, textureSize/2, 0, Math.PI * 2);
+            context.fill();
+
+            // Create sphere points
+            const radius = 7;
+            const numPoints = 4000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const basePositions = [];
+            const colors = [];
+
+            // Generate spherical points with colors
+            for(let i = 0; i < numPoints; i++) {
+                const phi = Math.acos(-1 + (2 * i) / numPoints);
+                const theta = Math.sqrt(numPoints * Math.PI) * phi;
+                
+                const x = radius * Math.cos(theta) * Math.sin(phi);
+                const y = radius * Math.sin(theta) * Math.sin(phi);
+                const z = radius * Math.cos(phi);
+                
+                positions.push(x, y, z);
+                basePositions.push(x, y, z);
+                
+                // Assign random color from palette
+                const color = new THREE.Color(colorPalette[Math.floor(Math.random() * colorPalette.length)]);
+                colors.push(color.r, color.g, color.b);
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            points = new THREE.Points(geometry, new THREE.PointsMaterial({
+                size: 7.0,
+                vertexColors: true,
+                transparent: true,
+                opacity: 1,
+                sizeAttenuation: false,
+                map: new THREE.CanvasTexture(canvas),
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            
+            pivot.add(points);
+            camera.position.z = 15;
+
+            // Store base positions for wave calculation
+            points.geometry.basePositions = new THREE.Float32BufferAttribute(basePositions, 3);
+
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambientLight);
+
+            // Rotation controls
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+
+            window.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition.x = e.clientX;
+                previousMousePosition.y = e.clientY;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if(!isDragging) return;
+                
+                const deltaX = e.clientX - previousMousePosition.x;
+                const deltaY = e.clientY - previousMousePosition.y;
+                
+                pivot.rotation.y += deltaX * 0.005;
+                pivot.rotation.x += deltaY * 0.005;
+                
+                previousMousePosition.x = e.clientX;
+                previousMousePosition.y = e.clientY;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const positions = points.geometry.attributes.position.array;
+            const basePositions = points.geometry.basePositions.array;
+            const time = Date.now() * 0.001;
+
+            // Apply multiple wave effects
+            for(let i = 0; i < positions.length; i += 3) {
+                const x = basePositions[i];
+                const y = basePositions[i + 1];
+                const z = basePositions[i + 2];
+                
+                let totalDisplacement = 0;
+                
+                // Calculate displacement from each wave
+                waves.forEach(wave => {
+                    // Calculate dot product with wave direction
+                    const dot = x * wave.direction.x + 
+                              y * wave.direction.y + 
+                              z * wave.direction.z;
+                    
+                    // Wave calculation with phase offset
+                    totalDisplacement += Math.sin(
+                        time * wave.speed + 
+                        dot * wave.frequency + 
+                        wave.phase
+                    ) * wave.amplitude;
+                });
+
+                // Apply displacement along the normal direction
+                const length = Math.sqrt(x*x + y*y + z*z);
+                const normX = x/length;
+                const normY = y/length;
+                const normZ = z/length;
+
+                positions[i] = x + normX * totalDisplacement;
+                positions[i + 1] = y + normY * totalDisplacement;
+                positions[i + 2] = z + normZ * totalDisplacement;
+            }
+
+            points.geometry.attributes.position.needsUpdate = true;
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
