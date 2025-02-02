@@ -21,26 +21,26 @@
         // Wave parameters
         const waves = [
             { // Wave 1
-                speed: 0.6,
-                frequency: 24,
-                amplitude: 0.1,
+                speed: 2,
+                frequency: 0.6,
+                amplitude: 0.04,
                 direction: new THREE.Vector3(1, 0.5, 0.2).normalize(),
                 phase: 0
             },
-            { // Wave 2
+            /* { // Wave 2
                 speed: 0.8,
                 frequency: 12,
                 amplitude: 0.1,
                 direction: new THREE.Vector3(-0.3, 1, 0.7).normalize(),
                 phase: Math.PI/2
-            },
-            { // Wave 3
+            }, */
+            /* { // Wave 3
                 speed: 1.1,
                 frequency: 2,
                 amplitude: 0.1,
                 direction: new THREE.Vector3(0.4, -0.8, 0.5).normalize(),
                 phase: Math.PI
-            }
+            } */
         ];
 
         init();
@@ -50,7 +50,7 @@
             // Scene setup
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x000000);
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
@@ -61,7 +61,7 @@
 
             // Create star texture
             const canvas = document.createElement('canvas');
-            const textureSize = 512;
+            const textureSize = 1080;
             canvas.width = textureSize;
             canvas.height = textureSize;
             const context = canvas.getContext('2d');
